@@ -1,18 +1,18 @@
 /*
-* Copyright 2014 Dominick Baier, Brock Allen
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*   http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Copyright 2014 Dominick Baier, Brock Allen
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 var _httpRequest = new DefaultHttpRequest();
 var _promiseFactory = new DefaultPromiseFactory();
@@ -438,14 +438,30 @@ TokenManager.prototype.removeToken = function () {
     this.saveToken(null);
 }
 
-TokenManager.prototype.redirectForToken = function () {
+TokenManager.prototype.redirectForToken = function (retries) {
+    var mgr = this;
     var oidc = this.oidcClient;
-    oidc.createTokenRequestAsync().then(function (request) {
-        window.location = request.url;
-    }, function (err) {
-        console.error("TokenManager.redirectForToken error: " + (err && err.message || err || ""));
-    });
-}
+    if (retries === undefined) {
+        retries = 5;
+    }
+
+    var func = function () {
+        oidc.createTokenRequestAsync().then(function (request) {
+            window.location = request.url;
+        }, function (err) {
+            console.error("TokenManager.redirectForToken error: " + (err && err.message || err || ""));
+
+            if (retries > 0) {
+                setTimeout(function () {
+                    func();
+                }, 6000);
+                retries--;
+            } else {
+                throw err;
+            }
+        });
+    }
+};
 
 TokenManager.prototype.redirectForLogout = function () {
     var mgr = this;
@@ -464,8 +480,11 @@ TokenManager.prototype.processTokenCallbackAsync = function (queryString) {
     });
 }
 
-TokenManager.prototype.renewTokenSilentAsync = function () {
+TokenManager.prototype.renewTokenSilentAsync = function (retries) {
     var mgr = this;
+    if (retries === undefined) {
+        retries = 5;
+    }
 
     if (!mgr._settings.silent_redirect_uri) {
         return _promiseFactory.reject("silent_redirect_uri not configured");
@@ -476,15 +495,50 @@ TokenManager.prototype.renewTokenSilentAsync = function () {
     settings.prompt = "none";
 
     var oidc = new OidcClient(settings);
-    return oidc.createTokenRequestAsync().then(function (request) {
-        var frame = new FrameLoader(request.url);
-        return frame.loadAsync().then(function (hash) {
-            return oidc.processResponseAsync(hash).then(function (token) {
-                mgr.saveToken(token);
+
+
+    return new Promise(function (resolve, reject) {
+
+        var func = oidc.createTokenRequestAsync().then(function (request) {
+            var frame = new FrameLoader(request.url);
+            return frame.loadAsync().then(function (hash) {
+                return oidc.processResponseAsync(hash).then(function (token) {
+                    mgr.saveToken(token);
+                    resolve();
+                }, function () {
+                    if (retries > 0) {
+                        setTimeout(function () {
+                            func();
+                        }, 6000);
+                        retries--;
+                    } else {
+                        reject();
+                    }
+                });
+            }, function () {
+                if (retries > 0) {
+                    setTimeout(function () {
+                        func();
+                    }, 6000);
+                    retries--;
+                } else {
+                    reject();
+                }
             });
+        }, function () {
+            if (retries > 0) {
+                setTimeout(function () {
+                    func();
+                }, 6000);
+                retries--;
+            } else {
+                reject();
+            }
         });
+
     });
-}
+};
+
 
 TokenManager.prototype.processTokenCallbackSilent = function (hash) {
     if (window.parent && window !== window.parent) {
