@@ -1,6 +1,6 @@
 {
   "name": "oidc-token-manager-fbox",
-  "version": "0.1.2",
+  "version": "0.1.2.1",
   "homepage": "https://github.com/IdentityModel/oidc-token-manager",
    "authors": [
     "Brock Allen <brockallen@gmail.com>",
