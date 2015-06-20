@@ -548,5 +548,3 @@ TokenManager.prototype.processTokenCallbackSilent = function (hash) {
         }
     }
 }
-
-    

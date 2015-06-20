@@ -155,3 +155,4 @@ $RECYCLE.BIN/
 distribution/
 *_NCrunch_*
 source/IdentityServer3.sln.GhostDoc.xml
+.idea/**
