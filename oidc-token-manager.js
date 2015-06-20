@@ -460,7 +460,9 @@ TokenManager.prototype.redirectForToken = function (retries) {
                 throw err;
             }
         });
-    }
+    };
+
+    func();
 };
 
 TokenManager.prototype.redirectForLogout = function () {
@@ -499,50 +501,59 @@ TokenManager.prototype.renewTokenSilentAsync = function (retries) {
 
     return new Promise(function (resolve, reject) {
 
-        var func = oidc.createTokenRequestAsync().then(function (request) {
-            var frame = new FrameLoader(request.url);
-            return frame.loadAsync().then(function (hash) {
-                return oidc.processResponseAsync(hash).then(function (token) {
-                    mgr.saveToken(token);
-                    resolve();
-                }, function () {
+        var func = function () {
+            oidc.createTokenRequestAsync().then(function (request) {
+                var frame = new FrameLoader(request.url);
+                return frame.loadAsync().then(function (hash) {
+                    return oidc.processResponseAsync(hash).then(function (token) {
+                        mgr.saveToken(token);
+                        resolve();
+                    }, function (err) {
+                        if (err.message == 'login_required') {
+                            reject('login_required');
+                            throw err;
+                        } else if (retries > 0) {
+                            setTimeout(function () {
+                                func();
+                            }, 6000);
+                            retries--;
+                        } else {
+                            reject(err ? err.message : null);
+                            throw err;
+                        }
+                    });
+                }, function (err) {
                     if (retries > 0) {
                         setTimeout(function () {
                             func();
                         }, 6000);
                         retries--;
                     } else {
-                        reject();
+                        reject(err ? err.message : null);
+                        throw err;
                     }
                 });
-            }, function () {
+            }, function (err) {
                 if (retries > 0) {
                     setTimeout(function () {
                         func();
                     }, 6000);
                     retries--;
                 } else {
-                    reject();
+                    reject(err ? err.message : null);
+                    throw err;
                 }
             });
-        }, function () {
-            if (retries > 0) {
-                setTimeout(function () {
-                    func();
-                }, 6000);
-                retries--;
-            } else {
-                reject();
-            }
-        });
+        };
 
+        func();
     });
 };
 
 
 TokenManager.prototype.processTokenCallbackSilent = function (hash) {
     if (window.parent && window !== window.parent) {
-        var hash = hash || window.location.hash;
+        hash = hash || window.location.hash;
         if (hash) {
             window.parent.postMessage(hash, location.protocol + "//" + location.host);
         }
