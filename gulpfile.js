@@ -15,7 +15,7 @@ gulp.task('default', ['clean'], function () {
 	  	'lib/iife-start.js'
 	    ,'lib/defaultHttpRequest.js'
 	    ,'lib/defaultPromiseFactory.js'
-		,'bower_components/oidc-client/dist/oidc-client.js'
+		,'lib/oidc-client.js'
 	    ,'oidc-token-manager.js'
 	  	,'lib/iife-end.js'
 	])
